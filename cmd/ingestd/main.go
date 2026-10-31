@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/tharunn0/ingestd/internal/config"
-	"github.com/tharunn0/ingestd/internal/server"
+	"github.com/tharunn0/ingestd/internal/http/server"
 )
 
 func main() {
