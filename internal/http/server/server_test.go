@@ -8,12 +8,18 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/tharunn0/ingestd/internal/config"
-	"github.com/tharunn0/ingestd/internal/server"
+	"github.com/tharunn0/ingestd/internal/http/handlers"
+	"github.com/tharunn0/ingestd/internal/http/server"
+	"github.com/tharunn0/ingestd/internal/service"
 )
 
+func newTestApp(secret string) *fiber.App {
+	cfg := config.Config{AuthSecretKey: []byte(secret)}
+	return server.New(cfg, handlers.NewTelemetryHandler(service.NewTransformService()))
+}
+
 func TestHealthEndpoint(t *testing.T) {
-	cfg := config.Config{AuthSecretKey: []byte("test-secret")}
-	app := server.New(cfg)
+	app := newTestApp("test-secret")
 
 	req, err := http.NewRequest(http.MethodGet, "/health", nil)
 	if err != nil {
@@ -46,8 +52,7 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestTelemetryEndpoint_Auth(t *testing.T) {
-	cfg := config.Config{AuthSecretKey: []byte("valid-key")}
-	app := server.New(cfg)
+	app := newTestApp("valid-key")
 
 	// Unauthorized without header
 	reqUnauthorized, _ := http.NewRequest(http.MethodPost, "/v1/telemetry", nil)
