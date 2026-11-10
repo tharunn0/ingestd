@@ -6,14 +6,18 @@ import (
 	"github.com/tharunn0/ingestd/internal/config"
 	"github.com/tharunn0/ingestd/internal/http/handlers"
 	"github.com/tharunn0/ingestd/internal/http/server"
+	"github.com/tharunn0/ingestd/internal/queue"
 	"github.com/tharunn0/ingestd/internal/service"
 )
+
+const queueCapacity = 10000
 
 func main() {
 
 	cfg := config.Init()
 
-	transformService := service.NewTransformService()
+	ingestionQueue := queue.New(queueCapacity)
+	transformService := service.NewTransformService(ingestionQueue)
 	telemetryHandler := handlers.NewTelemetryHandler(transformService)
 
 	app := server.New(cfg, telemetryHandler)

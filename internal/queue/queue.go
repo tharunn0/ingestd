@@ -55,5 +55,5 @@ func (q *IngestionQueue) Capacity() int {
 }
 
 func (q *IngestionQueue) Close() {
-	q.closed <- struct{}{}
+	close(q.closed)
 }

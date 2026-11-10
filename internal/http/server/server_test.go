@@ -4,18 +4,21 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/tharunn0/ingestd/internal/config"
 	"github.com/tharunn0/ingestd/internal/http/handlers"
 	"github.com/tharunn0/ingestd/internal/http/server"
+	"github.com/tharunn0/ingestd/internal/queue"
 	"github.com/tharunn0/ingestd/internal/service"
 )
 
 func newTestApp(secret string) *fiber.App {
 	cfg := config.Config{AuthSecretKey: []byte(secret)}
-	return server.New(cfg, handlers.NewTelemetryHandler(service.NewTransformService()))
+	svc := service.NewTransformService(queue.New(10))
+	return server.New(cfg, handlers.NewTelemetryHandler(svc))
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -66,7 +69,7 @@ func TestTelemetryEndpoint_Auth(t *testing.T) {
 	}
 
 	// Authorized with X-API-Key
-	reqAuthorized, _ := http.NewRequest(http.MethodPost, "/v1/telemetry", nil)
+	reqAuthorized, _ := http.NewRequest(http.MethodPost, "/v1/telemetry", strings.NewReader(`{"event_name":"click"}`))
 	reqAuthorized.Header.Set("X-API-Key", "valid-key")
 	resp, err = app.Test(reqAuthorized)
 	if err != nil {
