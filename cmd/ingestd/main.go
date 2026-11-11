@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/config"
 	"github.com/tharunn0/ingestd/internal/dlq"
+	"github.com/tharunn0/ingestd/internal/downstream"
 	"github.com/tharunn0/ingestd/internal/http/handlers"
 	"github.com/tharunn0/ingestd/internal/http/server"
 	"github.com/tharunn0/ingestd/internal/metrics"
@@ -38,7 +39,9 @@ func run() error {
 	}
 
 	ingestionQueue := queue.New(cfg.QueueCapacity)
-	pool := worker.New(ingestionQueue.Jobs(), cfg.WorkerCount, deadLetters)
+	sender := downstream.New(cfg.WebhookURL, cfg.WebhookTimeout)
+	retry := worker.RetryPolicy{MaxAttempts: cfg.MaxAttempts, BaseBackoff: cfg.RetryBackoff}
+	pool := worker.New(ingestionQueue.Jobs(), cfg.WorkerCount, sender, deadLetters, retry)
 	pool.Start()
 
 	if err := metrics.Register(prometheus.DefaultRegisterer, ingestionQueue, pool, deadLetters); err != nil {

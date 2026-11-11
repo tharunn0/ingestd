@@ -33,6 +33,10 @@ var optionalKeys = []string{
 	"INGESTD_WORKER_COUNT",
 	"INGESTD_DLQ_PATH",
 	"INGESTD_SHUTDOWN_TIMEOUT",
+	"INGESTD_WEBHOOK_URL",
+	"INGESTD_WEBHOOK_TIMEOUT",
+	"INGESTD_MAX_ATTEMPTS",
+	"INGESTD_RETRY_BACKOFF",
 }
 
 func TestConfigInit_RuntimeDefaults(t *testing.T) {
@@ -57,6 +61,18 @@ func TestConfigInit_RuntimeDefaults(t *testing.T) {
 	if cfg.ShutdownTimeout != 15*time.Second {
 		t.Errorf("expected default shutdown timeout 15s, got %s", cfg.ShutdownTimeout)
 	}
+	if cfg.WebhookURL != "http://localhost:9000/webhook" {
+		t.Errorf("expected default webhook url, got %q", cfg.WebhookURL)
+	}
+	if cfg.WebhookTimeout != 5*time.Second {
+		t.Errorf("expected default webhook timeout 5s, got %s", cfg.WebhookTimeout)
+	}
+	if cfg.MaxAttempts != 3 {
+		t.Errorf("expected default max attempts 3, got %d", cfg.MaxAttempts)
+	}
+	if cfg.RetryBackoff != 200*time.Millisecond {
+		t.Errorf("expected default retry backoff 200ms, got %s", cfg.RetryBackoff)
+	}
 }
 
 func TestConfigInit_RuntimeFromEnv(t *testing.T) {
@@ -65,8 +81,25 @@ func TestConfigInit_RuntimeFromEnv(t *testing.T) {
 	t.Setenv("INGESTD_WORKER_COUNT", "4")
 	t.Setenv("INGESTD_DLQ_PATH", "/tmp/custom.jsonl")
 	t.Setenv("INGESTD_SHUTDOWN_TIMEOUT", "30s")
+	t.Setenv("INGESTD_WEBHOOK_URL", "http://example.test/hook")
+	t.Setenv("INGESTD_WEBHOOK_TIMEOUT", "2s")
+	t.Setenv("INGESTD_MAX_ATTEMPTS", "5")
+	t.Setenv("INGESTD_RETRY_BACKOFF", "50ms")
 
 	cfg := config.Init()
+
+	if cfg.WebhookURL != "http://example.test/hook" {
+		t.Errorf("expected custom webhook url, got %q", cfg.WebhookURL)
+	}
+	if cfg.WebhookTimeout != 2*time.Second {
+		t.Errorf("expected webhook timeout 2s, got %s", cfg.WebhookTimeout)
+	}
+	if cfg.MaxAttempts != 5 {
+		t.Errorf("expected max attempts 5, got %d", cfg.MaxAttempts)
+	}
+	if cfg.RetryBackoff != 50*time.Millisecond {
+		t.Errorf("expected retry backoff 50ms, got %s", cfg.RetryBackoff)
+	}
 
 	if cfg.ListenAddr != ":8080" {
 		t.Errorf("expected listen addr ':8080', got %q", cfg.ListenAddr)

@@ -4,16 +4,29 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/model"
 )
 
+type Sender interface {
+	Send(ctx context.Context, event *model.TransformedEvent) error
+}
+
+type RetryPolicy struct {
+	MaxAttempts int
+	BaseBackoff time.Duration
+}
+
+// Pool refer to the worker pools that process from the jobs chan
 type Pool struct {
-	jobs <-chan model.Job
-	size int
-	dlq  *dlq.DLQ
+	jobs   <-chan model.Job
+	size   int
+	sender Sender
+	dlq    *dlq.DLQ
+	retry  RetryPolicy
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -28,12 +41,14 @@ type Pool struct {
 	processed atomic.Uint64
 }
 
-func New(jobs <-chan model.Job, size int, deadLetters *dlq.DLQ) *Pool {
+func New(jobs <-chan model.Job, size int, sender Sender, deadLetters *dlq.DLQ, retry RetryPolicy) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pool{
 		jobs:   jobs,
 		size:   size,
+		sender: sender,
 		dlq:    deadLetters,
+		retry:  retry,
 		ctx:    ctx,
 		cancel: cancel,
 		stop:   make(chan struct{}),
@@ -42,7 +57,6 @@ func New(jobs <-chan model.Job, size int, deadLetters *dlq.DLQ) *Pool {
 
 func (p *Pool) Start() {
 	for range p.size {
-		p.total.Add(1)
 		p.wg.Go(p.run)
 	}
 }
@@ -78,6 +92,7 @@ func (p *Pool) Processed() uint64 {
 }
 
 func (p *Pool) run() {
+	p.total.Add(1)
 	defer p.total.Add(-1)
 
 	for {
@@ -86,7 +101,7 @@ func (p *Pool) run() {
 			if !ok {
 				return
 			}
-			p.execute(job)
+			p.process(job)
 		case <-p.stop:
 			p.drain()
 			return
@@ -101,24 +116,47 @@ func (p *Pool) drain() {
 			if !ok {
 				return
 			}
-			p.execute(job)
+			p.process(job)
 		default:
 			return
 		}
 	}
 }
 
-func (p *Pool) execute(job model.Job) {
+func (p *Pool) process(job model.Job) {
 	p.active.Add(1)
 	defer p.active.Add(-1)
-	p.process(p.ctx, job)
+	event := model.Transform(job)
+
+	attempts, err := p.deliver(event)
+	if err != nil {
+		p.deadLetter(event, attempts, err)
+		return
+	}
 	p.processed.Add(1)
 }
 
-func (p *Pool) process(ctx context.Context, job model.Job) {
-	// TODO: transform job.Payload, deliver downstream with retry, and call
-	// p.deadLetter once the attempts are exhausted.
-	_, _ = ctx, job
+func (p *Pool) deliver(event *model.TransformedEvent) (int, error) {
+	backoff := p.retry.BaseBackoff
+
+	for attempt := 1; ; attempt++ {
+		err := p.sender.Send(p.ctx, event)
+		if err == nil {
+			return attempt, nil
+		}
+		if attempt >= p.retry.MaxAttempts {
+			return attempt, err
+		}
+
+		timer := time.NewTimer(backoff)
+		select {
+		case <-timer.C:
+		case <-p.ctx.Done():
+			timer.Stop()
+			return attempt, err
+		}
+		backoff *= 2
+	}
 }
 
 func (p *Pool) deadLetter(event *model.TransformedEvent, attempts int, cause error) {

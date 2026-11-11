@@ -16,6 +16,10 @@ import (
 	"github.com/tharunn0/ingestd/internal/worker"
 )
 
+type okSender struct{}
+
+func (okSender) Send(context.Context, *model.TransformedEvent) error { return nil }
+
 type components struct {
 	queue    *queue.IngestionQueue
 	workerIn chan model.Job
@@ -33,7 +37,7 @@ func newComponents(t *testing.T) components {
 	}
 
 	workerIn := make(chan model.Job)
-	pool := worker.New(workerIn, 4, d)
+	pool := worker.New(workerIn, 4, okSender{}, d, worker.RetryPolicy{MaxAttempts: 1})
 	pool.Start()
 
 	t.Cleanup(func() {
@@ -56,7 +60,7 @@ func expectMetrics(t *testing.T, reg *prometheus.Registry, want string) {
 func waitForProcessed(t *testing.T, pool *worker.Pool, want int) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
-	for pool.Processed() != want || pool.ActiveWorkers() != 0 {
+	for pool.Processed() != uint64(want) || pool.ActiveWorkers() != 0 {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected %d processed events, got %d", want, pool.Processed())
 		}
@@ -71,7 +75,7 @@ ingestd_dlq_events_total DLQ_EVENTS
 # HELP ingestd_dlq_write_errors_total Dead letter records that could not be persisted.
 # TYPE ingestd_dlq_write_errors_total counter
 ingestd_dlq_write_errors_total 0
-# HELP ingestd_events_processed_total Telemetry events taken off the queue and processed by a worker.
+# HELP ingestd_events_processed_total Telemetry events delivered downstream by a worker.
 # TYPE ingestd_events_processed_total counter
 ingestd_events_processed_total PROCESSED
 # HELP ingestd_queue_capacity Maximum number of jobs the ingestion queue can buffer.

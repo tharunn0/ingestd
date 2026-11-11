@@ -41,7 +41,7 @@ func TestPool_DeadLetterPersistsRecord(t *testing.T) {
 	}
 	defer d.Close()
 
-	p := New(make(chan model.Job), 1, d)
+	p := New(make(chan model.Job), 1, nil, d, RetryPolicy{})
 	event := model.Transform(model.Job{
 		TenantID: "org_enterprise_99",
 		Payload:  model.RawEvent{"ev_name": "user_checkout_completed"},
@@ -106,7 +106,7 @@ func TestPool_DeadLetterLogsErrorWhenWriteFails(t *testing.T) {
 		t.Fatalf("failed to close dlq: %v", err)
 	}
 
-	p := New(make(chan model.Job), 1, d)
+	p := New(make(chan model.Job), 1, nil, d, RetryPolicy{})
 	event := model.Transform(model.Job{TenantID: "t1", Payload: model.RawEvent{"ev_name": "click"}})
 
 	p.deadLetter(event, 3, errors.New("timeout"))

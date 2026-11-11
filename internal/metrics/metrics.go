@@ -29,7 +29,7 @@ func Register(reg prometheus.Registerer, q *queue.IngestionQueue, w *worker.Pool
 		gauge("ingestd_queue_capacity", "Maximum number of jobs the ingestion queue can buffer.", q.Capacity),
 		gauge("ingestd_workers_active", "Workers currently processing a job.", w.ActiveWorkers),
 		gauge("ingestd_workers_total", "Worker goroutines currently running.", w.TotalWorkers),
-		counter("ingestd_events_processed_total", "Telemetry events taken off the queue and processed by a worker.", w.Processed),
+		counter("ingestd_events_processed_total", "Telemetry events delivered downstream by a worker.", w.Processed),
 		counter("ingestd_dlq_events_total", "Events handed to the dead letter queue.", func() uint64 {
 			return d.Metrics().FailedEvents
 		}),

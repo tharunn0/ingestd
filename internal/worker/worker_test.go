@@ -11,6 +11,12 @@ import (
 	"github.com/tharunn0/ingestd/internal/worker"
 )
 
+var testRetry = worker.RetryPolicy{MaxAttempts: 3, BaseBackoff: time.Millisecond}
+
+type okSender struct{}
+
+func (okSender) Send(context.Context, *model.TransformedEvent) error { return nil }
+
 func newDLQ(t *testing.T) *dlq.DLQ {
 	t.Helper()
 	d, err := dlq.New(filepath.Join(t.TempDir(), "dlq.jsonl"))
@@ -31,13 +37,14 @@ func shutdown(t *testing.T, p *worker.Pool) {
 }
 
 func TestPool_StartAndShutdown(t *testing.T) {
-	p := worker.New(make(chan model.Job, 10), 4, newDLQ(t))
+	p := worker.New(make(chan model.Job, 10), 4, okSender{}, newDLQ(t), testRetry)
 
 	if got := p.TotalWorkers(); got != 0 {
 		t.Fatalf("expected 0 total workers before Start, got %d", got)
 	}
 
 	p.Start()
+	time.Sleep(100 * time.Millisecond)
 	if got := p.TotalWorkers(); got != 4 {
 		t.Fatalf("expected 4 total workers after Start, got %d", got)
 	}
@@ -57,7 +64,7 @@ func TestPool_ShutdownDrainsQueue(t *testing.T) {
 		jobs <- model.Job{Payload: model.RawEvent{"event_name": "click"}}
 	}
 
-	p := worker.New(jobs, 3, newDLQ(t))
+	p := worker.New(jobs, 3, okSender{}, newDLQ(t), testRetry)
 	p.Start()
 	shutdown(t, p)
 
@@ -71,7 +78,7 @@ func TestPool_ShutdownDrainsQueue(t *testing.T) {
 }
 
 func TestPool_ShutdownIsIdempotent(t *testing.T) {
-	p := worker.New(make(chan model.Job), 2, newDLQ(t))
+	p := worker.New(make(chan model.Job), 2, okSender{}, newDLQ(t), testRetry)
 	p.Start()
 
 	shutdown(t, p)
@@ -80,7 +87,7 @@ func TestPool_ShutdownIsIdempotent(t *testing.T) {
 
 func TestPool_WorkersExitWhenJobsChannelClosed(t *testing.T) {
 	jobs := make(chan model.Job)
-	p := worker.New(jobs, 2, newDLQ(t))
+	p := worker.New(jobs, 2, okSender{}, newDLQ(t), testRetry)
 	p.Start()
 
 	close(jobs)

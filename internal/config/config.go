@@ -16,6 +16,10 @@ const (
 	defaultQueueCapacity   = 10000
 	defaultWorkerCount     = 16
 	defaultShutdownTimeout = 15 * time.Second
+	defaultWebhookURL      = "http://localhost:9000/webhook"
+	defaultWebhookTimeout  = 5 * time.Second
+	defaultMaxAttempts     = 3
+	defaultRetryBackoff    = 200 * time.Millisecond
 )
 
 type Config struct {
@@ -25,6 +29,10 @@ type Config struct {
 	WorkerCount     int
 	DLQPath         string
 	ShutdownTimeout time.Duration
+	WebhookURL      string
+	WebhookTimeout  time.Duration
+	MaxAttempts     int
+	RetryBackoff    time.Duration
 }
 
 func Init() Config {
@@ -37,6 +45,10 @@ func Init() Config {
 		WorkerCount:     positiveIntEnv("INGESTD_WORKER_COUNT", defaultWorkerCount),
 		DLQPath:         stringEnv("INGESTD_DLQ_PATH", dlq.DefaultPath),
 		ShutdownTimeout: positiveDurationEnv("INGESTD_SHUTDOWN_TIMEOUT", defaultShutdownTimeout),
+		WebhookURL:      stringEnv("INGESTD_WEBHOOK_URL", defaultWebhookURL),
+		WebhookTimeout:  positiveDurationEnv("INGESTD_WEBHOOK_TIMEOUT", defaultWebhookTimeout),
+		MaxAttempts:     positiveIntEnv("INGESTD_MAX_ATTEMPTS", defaultMaxAttempts),
+		RetryBackoff:    positiveDurationEnv("INGESTD_RETRY_BACKOFF", defaultRetryBackoff),
 	}
 }
 
