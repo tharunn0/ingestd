@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/http/handlers"
+	"github.com/tharunn0/ingestd/internal/metrics"
 	"github.com/tharunn0/ingestd/internal/queue"
 	"github.com/tharunn0/ingestd/internal/service"
 )
@@ -123,6 +125,26 @@ func TestTelemetryHandler_IngestQueueFull(t *testing.T) {
 	}
 	if entry["level"] != "warn" || entry["error"] != queue.ErrQueueFull.Error() {
 		t.Fatalf("unexpected rejection log entry: %v", entry)
+	}
+}
+
+func TestTelemetryHandler_CountsReceivedAndRejected(t *testing.T) {
+	captureLogs(t)
+	app := newTestApp(queue.New(2))
+
+	received := testutil.ToFloat64(metrics.EventsReceived)
+	rejected := testutil.ToFloat64(metrics.EventsRejected)
+
+	post(t, app, validBody)
+	post(t, app, validBody)
+	post(t, app, validBody)
+	post(t, app, "{not json")
+
+	if got := testutil.ToFloat64(metrics.EventsReceived) - received; got != 2 {
+		t.Errorf("expected 2 received events, got %v", got)
+	}
+	if got := testutil.ToFloat64(metrics.EventsRejected) - rejected; got != 1 {
+		t.Errorf("expected 1 rejected event, got %v", got)
 	}
 }
 

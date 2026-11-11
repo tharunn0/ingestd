@@ -50,6 +50,10 @@ func (q *IngestionQueue) Jobs() <-chan model.Job {
 	return q.jobs
 }
 
+func (q *IngestionQueue) Len() int {
+	return len(q.jobs)
+}
+
 func (q *IngestionQueue) Capacity() int {
 	return q.capacity
 }

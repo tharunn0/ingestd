@@ -80,3 +80,36 @@ func TestTelemetryEndpoint_Auth(t *testing.T) {
 		t.Fatalf("expected 202, got %d", resp.StatusCode)
 	}
 }
+
+func TestMetricsEndpoint(t *testing.T) {
+	app := newTestApp("test-secret")
+
+	req, err := http.NewRequest(http.MethodGet, "/metrics", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("expected status %d, got %d", fiber.StatusOK, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+
+	for _, name := range []string{
+		"ingestd_events_received_total",
+		"ingestd_events_rejected_total",
+	} {
+		if !strings.Contains(string(body), name) {
+			t.Errorf("expected %s in /metrics output", name)
+		}
+	}
+}

@@ -24,6 +24,8 @@ type Pool struct {
 
 	total  atomic.Int32
 	active atomic.Int32
+
+	processed atomic.Uint64
 }
 
 func New(jobs <-chan model.Job, size int, deadLetters *dlq.DLQ) *Pool {
@@ -71,6 +73,10 @@ func (p *Pool) ActiveWorkers() int {
 	return int(p.active.Load())
 }
 
+func (p *Pool) Processed() uint64 {
+	return p.processed.Load()
+}
+
 func (p *Pool) run() {
 	defer p.total.Add(-1)
 
@@ -106,6 +112,7 @@ func (p *Pool) execute(job model.Job) {
 	p.active.Add(1)
 	defer p.active.Add(-1)
 	p.process(p.ctx, job)
+	p.processed.Add(1)
 }
 
 func (p *Pool) process(ctx context.Context, job model.Job) {

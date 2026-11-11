@@ -7,12 +7,14 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/config"
 	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/http/handlers"
 	"github.com/tharunn0/ingestd/internal/http/server"
+	"github.com/tharunn0/ingestd/internal/metrics"
 	"github.com/tharunn0/ingestd/internal/queue"
 	"github.com/tharunn0/ingestd/internal/service"
 	"github.com/tharunn0/ingestd/internal/worker"
@@ -38,6 +40,10 @@ func run() error {
 	ingestionQueue := queue.New(cfg.QueueCapacity)
 	pool := worker.New(ingestionQueue.Jobs(), cfg.WorkerCount, deadLetters)
 	pool.Start()
+
+	if err := metrics.Register(prometheus.DefaultRegisterer, ingestionQueue, pool, deadLetters); err != nil {
+		return err
+	}
 
 	transformService := service.NewTransformService(ingestionQueue)
 	telemetryHandler := handlers.NewTelemetryHandler(transformService)

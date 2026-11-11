@@ -61,6 +61,10 @@ func TestPool_ShutdownDrainsQueue(t *testing.T) {
 	p.Start()
 	shutdown(t, p)
 
+	if got := p.Processed(); got != 100 {
+		t.Fatalf("expected 100 processed events, got %d", got)
+	}
+
 	if remaining := len(jobs); remaining != 0 {
 		t.Fatalf("expected queue to be drained, %d jobs remaining", remaining)
 	}

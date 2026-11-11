@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/tharunn0/ingestd/internal/metrics"
 	"github.com/tharunn0/ingestd/internal/model"
 	"github.com/tharunn0/ingestd/internal/queue"
 	"github.com/tharunn0/ingestd/internal/service"
@@ -18,7 +19,6 @@ const rejectionLogsPerSecond = 5
 type TelemetryHandler struct {
 	serv *service.TransformService
 
-	// Sampled so sustained backpressure cannot turn into a log flood on the hot path.
 	rejections zerolog.Logger
 }
 
@@ -47,6 +47,7 @@ func (h *TelemetryHandler) Ingest(c fiber.Ctx) error {
 
 	if err := h.serv.Enqueue(job); err != nil {
 		if errors.Is(err, queue.ErrQueueFull) || errors.Is(err, queue.ErrQueueClosed) {
+			metrics.EventsRejected.Inc()
 			h.rejections.Warn().Err(err).Msg("telemetry rejected")
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"error": err.Error(),
@@ -55,6 +56,7 @@ func (h *TelemetryHandler) Ingest(c fiber.Ctx) error {
 		return err
 	}
 
+	metrics.EventsReceived.Inc()
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 		"status": "accepted",
 	})
