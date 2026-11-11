@@ -2,12 +2,24 @@ package worker_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/model"
 	"github.com/tharunn0/ingestd/internal/worker"
 )
+
+func newDLQ(t *testing.T) *dlq.DLQ {
+	t.Helper()
+	d, err := dlq.New(filepath.Join(t.TempDir(), "dlq.jsonl"))
+	if err != nil {
+		t.Fatalf("failed to create dlq: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	return d
+}
 
 func shutdown(t *testing.T, p *worker.Pool) {
 	t.Helper()
@@ -19,7 +31,7 @@ func shutdown(t *testing.T, p *worker.Pool) {
 }
 
 func TestPool_StartAndShutdown(t *testing.T) {
-	p := worker.New(make(chan model.Job, 10), 4)
+	p := worker.New(make(chan model.Job, 10), 4, newDLQ(t))
 
 	if got := p.TotalWorkers(); got != 0 {
 		t.Fatalf("expected 0 total workers before Start, got %d", got)
@@ -45,7 +57,7 @@ func TestPool_ShutdownDrainsQueue(t *testing.T) {
 		jobs <- model.Job{Payload: model.RawEvent{"event_name": "click"}}
 	}
 
-	p := worker.New(jobs, 3)
+	p := worker.New(jobs, 3, newDLQ(t))
 	p.Start()
 	shutdown(t, p)
 
@@ -55,7 +67,7 @@ func TestPool_ShutdownDrainsQueue(t *testing.T) {
 }
 
 func TestPool_ShutdownIsIdempotent(t *testing.T) {
-	p := worker.New(make(chan model.Job), 2)
+	p := worker.New(make(chan model.Job), 2, newDLQ(t))
 	p.Start()
 
 	shutdown(t, p)
@@ -64,7 +76,7 @@ func TestPool_ShutdownIsIdempotent(t *testing.T) {
 
 func TestPool_WorkersExitWhenJobsChannelClosed(t *testing.T) {
 	jobs := make(chan model.Job)
-	p := worker.New(jobs, 2)
+	p := worker.New(jobs, 2, newDLQ(t))
 	p.Start()
 
 	close(jobs)

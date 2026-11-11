@@ -2,15 +2,18 @@ package worker
 
 import (
 	"context"
+	"log"
 	"sync"
 	"sync/atomic"
 
+	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/model"
 )
 
 type Pool struct {
 	jobs <-chan model.Job
 	size int
+	dlq  *dlq.DLQ
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -23,11 +26,12 @@ type Pool struct {
 	active atomic.Int32
 }
 
-func New(jobs <-chan model.Job, size int) *Pool {
+func New(jobs <-chan model.Job, size int, deadLetters *dlq.DLQ) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pool{
 		jobs:   jobs,
 		size:   size,
+		dlq:    deadLetters,
 		ctx:    ctx,
 		cancel: cancel,
 		stop:   make(chan struct{}),
@@ -105,6 +109,19 @@ func (p *Pool) execute(job model.Job) {
 }
 
 func (p *Pool) process(ctx context.Context, job model.Job) {
-	// TODO: transform job.Payload and deliver downstream with retry/DLQ.
+	// TODO: transform job.Payload, deliver downstream with retry, and call
+	// p.deadLetter once the attempts are exhausted.
 	_, _ = ctx, job
+}
+
+func (p *Pool) deadLetter(event *model.TransformedEvent, attempts int, cause error) {
+	record := dlq.Record{
+		TenantID:      event.OrganizationID,
+		RetryAttempts: attempts,
+		Reason:        cause.Error(),
+		Payload:       *event,
+	}
+	if err := p.dlq.Enqueue(record); err != nil {
+		log.Printf("worker: failed to dead-letter event %q: %v", event.EventName, err)
+	}
 }
