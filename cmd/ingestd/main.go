@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/config"
 	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/http/handlers"
@@ -17,8 +19,11 @@ import (
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.WarnLevel)
+
 	if err := run(); err != nil {
-		log.Fatalf("ingestd stopped with error: %v", err)
+		log.Error().Err(err).Msg("ingestd stopped with error")
+		os.Exit(1)
 	}
 }
 
@@ -43,7 +48,6 @@ func run() error {
 
 	listenErr := make(chan error, 1)
 	go func() {
-		log.Printf("Starting ingestd on %s...", cfg.ListenAddr)
 		listenErr <- app.Listen(cfg.ListenAddr)
 	}()
 
@@ -51,7 +55,6 @@ func run() error {
 	select {
 	case serveErr = <-listenErr:
 	case <-ctx.Done():
-		log.Println("Shutdown signal received, draining...")
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)

@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/gofiber/fiber/v3 v3.6.1
 	github.com/joho/godotenv v1.5.1
+	github.com/rs/zerolog v1.35.1
 )
 
 require (

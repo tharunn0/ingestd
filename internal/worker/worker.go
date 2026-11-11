@@ -2,10 +2,10 @@ package worker
 
 import (
 	"context"
-	"log"
 	"sync"
 	"sync/atomic"
 
+	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/model"
 )
@@ -121,7 +121,17 @@ func (p *Pool) deadLetter(event *model.TransformedEvent, attempts int, cause err
 		Reason:        cause.Error(),
 		Payload:       *event,
 	}
+	failure := log.Warn()
+	msg := "event dead-lettered"
 	if err := p.dlq.Enqueue(record); err != nil {
-		log.Printf("worker: failed to dead-letter event %q: %v", event.EventName, err)
+		failure = log.Error().AnErr("dlq_error", err)
+		msg = "event lost: dead-letter write failed"
 	}
+
+	failure.
+		Str("tenant_id", record.TenantID).
+		Str("event_name", event.EventName).
+		Int("retry_attempts", attempts).
+		Str("reason", record.Reason).
+		Msg(msg)
 }

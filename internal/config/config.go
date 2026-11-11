@@ -1,12 +1,12 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 	"github.com/tharunn0/ingestd/internal/dlq"
 )
 
@@ -55,7 +55,7 @@ func positiveIntEnv(key string, fallback int) int {
 
 	value, err := strconv.Atoi(raw)
 	if err != nil || value <= 0 {
-		log.Printf("config: invalid %s=%q, using default %d", key, raw, fallback)
+		log.Warn().Str("key", key).Str("value", raw).Int("default", fallback).Msg("invalid config value, using default")
 		return fallback
 	}
 	return value
@@ -69,7 +69,7 @@ func positiveDurationEnv(key string, fallback time.Duration) time.Duration {
 
 	value, err := time.ParseDuration(raw)
 	if err != nil || value <= 0 {
-		log.Printf("config: invalid %s=%q, using default %s", key, raw, fallback)
+		log.Warn().Str("key", key).Str("value", raw).Dur("default", fallback).Msg("invalid config value, using default")
 		return fallback
 	}
 	return value
