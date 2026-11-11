@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +12,8 @@ import (
 	"github.com/tharunn0/ingestd/internal/dlq"
 	"github.com/tharunn0/ingestd/internal/model"
 )
+
+var ErrMaxAttemptReached = errors.New("max attempts reached")
 
 type Sender interface {
 	Send(ctx context.Context, event *model.TransformedEvent) error
@@ -145,7 +149,7 @@ func (p *Pool) deliver(event *model.TransformedEvent) (int, error) {
 			return attempt, nil
 		}
 		if attempt >= p.retry.MaxAttempts {
-			return attempt, err
+			return attempt, fmt.Errorf("%w: %w", ErrMaxAttemptReached, err)
 		}
 
 		timer := time.NewTimer(backoff)

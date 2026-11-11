@@ -176,7 +176,7 @@ func TestPool_DeadLettersAfterExhaustingAttempts(t *testing.T) {
 	if record.RetryAttempts != 3 {
 		t.Errorf("expected 3 retry attempts, got %d", record.RetryAttempts)
 	}
-	if record.Reason != "downstream responded with status 503" {
+	if record.Reason != "max attempts reached: downstream responded with status 503" {
 		t.Errorf("unexpected reason %q", record.Reason)
 	}
 	if record.TenantID != "org_enterprise_99" || record.Payload.EventName != "user_checkout_completed" {
