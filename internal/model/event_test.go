@@ -9,7 +9,7 @@ import (
 )
 
 func sampleJob() model.Job {
-	return model.Job{Payload: model.RawEvent{
+	return model.Job{TenantID: "org_enterprise_99", Payload: model.RawEvent{
 		"ev_name":    "user_checkout_completed",
 		"ev_cat":     "ecommerce",
 		"tenant_id":  "org_enterprise_99",

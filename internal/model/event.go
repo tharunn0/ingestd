@@ -124,8 +124,6 @@ func foldSlots(p RawEvent, keys slotKeys) map[string]TypedValue {
 	return out
 }
 
-// slotValue builds the lookup key in a stack buffer; the compiler elides the
-// string conversion for map lookups, keeping the hot path allocation-free.
 func slotValue(p RawEvent, prefix, idx string) string {
 	var buf [32]byte
 	key := append(append(buf[:0], prefix...), idx...)
@@ -143,8 +141,6 @@ func isDigits(s string) bool {
 	}
 	return true
 }
-
-// NOTE: values stay strings; "type" is descriptive metadata, not a coercion hint.
 
 type RawEvent map[string]string
 
