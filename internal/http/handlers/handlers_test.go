@@ -17,7 +17,7 @@ import (
 	"github.com/tharunn0/ingestd/internal/service"
 )
 
-const validBody = `{"event_name":"click","dim_rk1":"browser","dim_rv1":"chrome","dim_rt1":"string"}`
+const validBody = `{"event_name":"click","tenant_id":"org_enterprise_99","dim_rk1":"browser","dim_rv1":"chrome","dim_rt1":"string"}`
 
 func captureLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
@@ -76,6 +76,9 @@ func TestTelemetryHandler_IngestAccepted(t *testing.T) {
 	case job := <-q.Jobs():
 		if job.Payload["dim_rv1"] != "chrome" {
 			t.Fatalf("expected dim_rv1 'chrome', got %q", job.Payload["dim_rv1"])
+		}
+		if job.TenantID != "org_enterprise_99" {
+			t.Fatalf("expected tenant 'org_enterprise_99', got %q", job.TenantID)
 		}
 		if job.ReceivedAt.IsZero() {
 			t.Fatal("expected ReceivedAt to be set")

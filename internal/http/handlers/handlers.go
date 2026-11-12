@@ -41,6 +41,7 @@ func (h *TelemetryHandler) Ingest(c fiber.Ctx) error {
 	}
 
 	job := model.Job{
+		TenantID:   payload["tenant_id"],
 		ReceivedAt: time.Now(),
 		Payload:    payload,
 	}
