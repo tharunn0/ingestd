@@ -90,9 +90,15 @@ func TestTelemetryHandler_IngestAccepted(t *testing.T) {
 
 func TestTelemetryHandler_IngestBadRequest(t *testing.T) {
 	cases := map[string]string{
-		"empty body":   "",
-		"invalid json": "{not json",
-		"empty object": "{}",
+		"empty body":          "",
+		"invalid json":        "{not json",
+		"empty object":        "{}",
+		"json array":          "[]",
+		"json number":         "123",
+		"json string":         `"string"`,
+		"non-string value":    `{"tenant_id": 123}`,
+		"nested object value": `{"tenant_id": {"nested": "value"}}`,
+		"null value":          `{"tenant_id": null}`,
 	}
 
 	for name, body := range cases {

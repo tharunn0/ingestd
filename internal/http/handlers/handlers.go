@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/tharunn0/ingestd/internal/model"
 	"github.com/tharunn0/ingestd/internal/queue"
 	"github.com/tharunn0/ingestd/internal/service"
+	"github.com/valyala/fastjson"
 )
 
 const rejectionLogsPerSecond = 5
@@ -20,6 +20,7 @@ type TelemetryHandler struct {
 	serv *service.TransformService
 
 	rejections zerolog.Logger
+	pool       fastjson.ParserPool
 }
 
 func NewTelemetryHandler(serv *service.TransformService) *TelemetryHandler {
@@ -33,8 +34,38 @@ func NewTelemetryHandler(serv *service.TransformService) *TelemetryHandler {
 }
 
 func (h *TelemetryHandler) Ingest(c fiber.Ctx) error {
-	var payload model.RawEvent
-	if err := json.Unmarshal(c.Body(), &payload); err != nil || len(payload) == 0 {
+	p := h.pool.Get()
+	defer h.pool.Put(p)
+
+	v, err := p.ParseBytes(c.Body())
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid telemetry payload",
+		})
+	}
+
+	obj, err := v.Object()
+	if err != nil || obj.Len() == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid telemetry payload",
+		})
+	}
+
+	payload := make(model.RawEvent, obj.Len())
+	var hasInvalidValue bool
+	obj.Visit(func(k []byte, v *fastjson.Value) {
+		if hasInvalidValue {
+			return
+		}
+		valBytes, err := v.StringBytes()
+		if err != nil {
+			hasInvalidValue = true
+			return
+		}
+		payload[string(k)] = string(valBytes)
+	})
+
+	if hasInvalidValue {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid telemetry payload",
 		})
